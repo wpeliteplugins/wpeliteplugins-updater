@@ -3,7 +3,7 @@
  * Plugin Name: WPElite Plugins Updater
  * Plugin URI: http://wpeliteplugins.com/
  * Description: WPElitePlugins Updater - The license and updater plugin for all WPElitePlugins products
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: WPElitePlugins
  * Network: true
  * Author URI: http://wpeliteplugins.com/
@@ -19,7 +19,7 @@ if ( !defined( 'ABSPATH' ) ) exit;
  * @since 1.0.0
  */
 if( !defined( 'WPELITEPLUGINS_UPD_VERSION' ) ) {
-	define( 'WPELITEPLUGINS_UPD_VERSION', '1.0.1' ); // plugin version
+	define( 'WPELITEPLUGINS_UPD_VERSION', '1.0.2' ); // plugin version
 }
 if( !defined( 'WPELITEPLUGINS_UPD_DIR' ) ) {
 	define( 'WPELITEPLUGINS_UPD_DIR', dirname( __FILE__ ) ); // plugin dir

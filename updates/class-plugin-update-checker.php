@@ -31,6 +31,7 @@ class WPElitePluginsUpdateChecker {
 
 	public $throttleRedundantChecks = false; //Check less often if we already know that an update is available.
 	public $throttledCheckPeriod = 72;
+	public $icons; // to display plugin image
 
 	private $cronHook = null;
 	private $debugBarPlugin = null;
@@ -135,7 +136,10 @@ class WPElitePluginsUpdateChecker {
 			add_action('load-update.php', array($this, 'maybeCheckForUpdates'));
 			//This hook fires after a bulk update is complete.
 			add_action('upgrader_process_complete', array($this, 'maybeCheckForUpdates'), 11, 0);
+			//add_action('upgrader_process_complete', array($this, 'savewpelitepluginsupdates'), 11, 2);
 
+			// Add action to call plugin activation hook
+			//add_action('admin_init', array($this, 'callpluginupdateaction'));
 		} else {
 			//Periodic checks are disabled.
 			wp_clear_scheduled_hook($this->cronHook);
@@ -225,13 +229,15 @@ class WPElitePluginsUpdateChecker {
 			$url,
 			$options
 		);
-		
+
 		//Try to parse the response
 		$pluginInfo = null;
 		if ( !is_wp_error($result) && isset($result['response']['code']) && ($result['response']['code'] == 200) && !empty($result['body']) ){
 			$pluginInfo = PluginInfo_2_0::fromJson($result['body'], $this->debugMode);
-			$pluginInfo->filename = $this->pluginFile;
-			$pluginInfo->slug = $this->slug;
+			if( !empty( $pluginInfo ) && is_object( $pluginInfo ) ) {
+				$pluginInfo->filename = $this->pluginFile;
+				$pluginInfo->slug = $this->slug;
+			}
 		} else if ( $this->debugMode ) {
 			$message = sprintf("The URL %s does not point to a valid plugin metadata file. ", $url);
 			if ( is_wp_error($result) ) {
@@ -422,7 +428,92 @@ class WPElitePluginsUpdateChecker {
 			$this->checkForUpdates();
 		}
 	}
-	
+
+	/**
+	 * Handles to save option for plugins whose author is WPElitePlugins
+	 * Checks for author WPElitePlugins and will execute hook only if author matches
+	 */
+	public function savewpelitepluginsupdates($upgrader_object, $options){
+
+		// Get plugin author and author URI
+		$plugin_author 		= isset( $upgrader_object->skin->plugin_info['Author'] ) ? $upgrader_object->skin->plugin_info['Author'] : '';
+		$plugin_author_uri 	= isset( $upgrader_object->skin->plugin_info['AuthorURI'] ) ? $upgrader_object->skin->plugin_info['AuthorURI'] : '';		
+
+		// Match plugin author
+		// Uncomment to match Author URI with author name
+		if( empty( $plugin_author ) || strtolower( $plugin_author ) != 'WPElitePlugins' ) {
+			//|| empty( $plugin_author_uri ) || $plugin_author_uri != 'http://wpeliteplugins.com' )			
+			return;
+		}
+
+		// Get plugin basename
+		$plugin = $options['plugins'][0];
+
+		$wpeliteplugins_plugin_updated = get_option( 'wpeliteplugins_plugin_updated' );
+		if( !empty( $wpeliteplugins_plugin_updated ) ) {
+			array_push($wpeliteplugins_plugin_updated, $plugin);
+		} else {
+			$wpeliteplugins_plugin_updated = array( $plugin );
+		}
+
+		update_option('wpeliteplugins_plugin_updated', $wpeliteplugins_plugin_updated);
+	}
+
+	/**
+	 * Handles to call activation for plugins after plugin gets updated
+	 * Checks for author WPElitePlugins and will execute hook only if author matches
+	 */
+	public function callpluginupdateaction(){
+
+		// Get option for updated plugins
+		$wpeliteplugins_plugin_updated = get_option( 'wpeliteplugins_plugin_updated' );
+
+		// If option is not empty and is array
+		if( !empty( $wpeliteplugins_plugin_updated ) && is_array( $wpeliteplugins_plugin_updated ) ) {
+
+			// Loop on each plugins
+			foreach( $wpeliteplugins_plugin_updated as $update_plugin ) {
+
+				// Check whether plugin is activated for whole network
+				$network_wide = false;
+				if ( is_multisite() && is_network_only_plugin($update_plugin) ) {
+					$network_wide = true;
+				}
+				
+				/**
+				 * Fires before a plugin is activated.
+				 *
+				 * If a plugin is silently activated (such as during an update),
+				 * this hook does not fire.
+				 *
+				 * @since 2.9.0
+				 *
+				 * @param string $plugin       Path to the main plugin file from plugins directory.
+				 * @param bool   $network_wide Whether to enable the plugin for all sites in the network
+				 *                             or just the current site. Multisite only. Default is false.
+				 */
+				do_action( 'activate_plugin', $update_plugin, $network_wide );
+				
+				/**
+				 * Fires as a specific plugin is being activated.
+				 *
+				 * This hook is the "activation" hook used internally by register_activation_hook().
+				 * The dynamic portion of the hook name, `$plugin`, refers to the plugin basename.
+				 *
+				 * If a plugin is silently activated (such as during an update), this hook does not fire.
+				 *
+				 * @since 2.0.0
+				 *
+				 * @param bool $network_wide Whether to enable the plugin for all sites in the network
+				 *                           or just the current site. Multisite only. Default is false.
+				 */
+				do_action( "activate_{$update_plugin}", $network_wide );
+			}
+
+			delete_option( 'wpeliteplugins_plugin_updated' );
+		}
+	}
+
 	/**
 	 * Load the update checker state from the DB.
 	 *  
@@ -779,8 +870,10 @@ class WPElitePluginsUpdateChecker {
 			//Convert both paths to the canonical form before comparison.
 			$muPluginDir = realpath(WPMU_PLUGIN_DIR);
 			$pluginPath  = realpath($this->pluginAbsolutePath);
-
-			$cachedResult = (strpos($pluginPath, $muPluginDir) === 0);
+			
+			if( !empty( $pluginPath ) && !empty( $muPluginDir ) ){
+				$cachedResult = (strpos($pluginPath, $muPluginDir) === 0);
+			}
 		}
 
 		return $cachedResult;
@@ -913,6 +1006,7 @@ class PluginInfo_2_0 {
 	public $id = 0; //The native WP.org API returns numeric plugin IDs, but they're not used for anything.
 
 	public $filename; //Plugin filename relative to the plugins directory.
+	public $icons; // to display plugin icon
 		
 	/**
 	 * Create a new instance of PluginInfo from JSON-encoded plugin info 
@@ -1025,8 +1119,9 @@ class PluginUpdate_2_0 {
 	public $download_url;
 	public $upgrade_notice;
 	public $filename; //Plugin filename relative to the plugins directory.
+	public $icons; // to display plugin icon
 
-	private static $fields = array('id', 'slug', 'version', 'homepage', 'download_url', 'upgrade_notice', 'filename');
+	private static $fields = array('id', 'slug', 'version', 'homepage', 'download_url', 'upgrade_notice', 'filename','icons');
 	
 	/**
 	 * Create a new instance of PluginUpdate from its JSON-encoded representation.
@@ -1113,6 +1208,13 @@ class PluginUpdate_2_0 {
 		$update->package = $this->download_url;
 		$update->plugin = $this->filename;
 
+		if ( isset( $this->icons ) && !empty($this->icons) ) {
+			//WP expects an array with two keys: "1x" and "2x". Both are optional.
+			//Docs: https://wordpress.org/plugins/about/faq/#icons
+			$update->icons = is_object($this->icons) ? get_object_vars($this->icons) : $this->icons;
+			$update->icons = array_intersect_key($update->icons, array('1x' => true, '2x' => true));
+		}
+
 		if ( !empty($this->upgrade_notice) ){
 			$update->upgrade_notice = $this->upgrade_notice;
 		}
@@ -1123,21 +1225,21 @@ class PluginUpdate_2_0 {
 	
 endif;
 
-if ( !class_exists('PucFactory') ):
+if ( !class_exists('WPElitePluginsPucFactory') ):
 
 /**
  * A factory that builds instances of other classes from this library.
  *
  * When multiple versions of the same class have been loaded (e.g. PluginUpdateChecker 1.2
  * and 1.3), this factory will always use the latest available version. Register class
- * versions by calling {@link PucFactory::addVersion()}.
+ * versions by calling {@link WPElitePluginsPucFactory::addVersion()}.
  *
  * At the moment it can only build instances of the PluginUpdateChecker class. Other classes
  * are intended mainly for internal use and refer directly to specific implementations. If you
- * want to instantiate one of them anyway, you can use {@link PucFactory::getLatestClassVersion()}
+ * want to instantiate one of them anyway, you can use {@link WPElitePluginsPucFactory::getLatestClassVersion()}
  * to get the class name and then create it with <code>new $class(...)</code>.
  */
-class PucFactory {
+class WPElitePluginsPucFactory {
 	protected static $classVersions = array();
 	protected static $sorted = false;
 
@@ -1213,17 +1315,17 @@ class PucFactory {
 endif;
 
 //Register classes defined in this file with the factory.
-PucFactory::addVersion('WPElitePluginsUpdateChecker', 'PluginUpdateChecker_2_0', '2.0');
-PucFactory::addVersion('PluginUpdate', 'PluginUpdate_2_0', '2.0');
-PucFactory::addVersion('PluginInfo', 'PluginInfo_2_0', '2.0');
-//PucFactory::addVersion('PucGitHubChecker', 'PucGitHubChecker_2_0', '2.0');
+WPElitePluginsPucFactory::addVersion('WPElitePluginsUpdateChecker', 'PluginUpdateChecker_2_0', '2.0');
+WPElitePluginsPucFactory::addVersion('PluginUpdate', 'PluginUpdate_2_0', '2.0');
+WPElitePluginsPucFactory::addVersion('PluginInfo', 'PluginInfo_2_0', '2.0');
+//WPElitePluginsPucFactory::addVersion('PucGitHubChecker', 'PucGitHubChecker_2_0', '2.0');
 
 /**
  * Create non-versioned variants of the update checker classes. This allows for backwards
  * compatibility with versions that did not use a factory, and it simplifies doc-comments.
  */
 if ( !class_exists('WPElitePluginsUpdateChecker') ) {
-	class WPElitePluginUpdateChecker extends PluginUpdateChecker_2_0 { }
+	class WPElitePluginsUpdateChecker extends PluginUpdateChecker_2_0 { }
 }
 
 if ( !class_exists('PluginUpdate') ) {

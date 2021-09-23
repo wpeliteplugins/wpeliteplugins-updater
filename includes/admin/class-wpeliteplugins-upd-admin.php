@@ -136,10 +136,10 @@ class WPElitePlugins_Upd_Admin {
 	public function wpeliteplugins_request_args_add_email_option( $queryArgs, $slug, $pluginFile ) {
 		
 		// purchase plugin email
-		$wpelitepluginsupd_email		= wpeliteplugins_all_plugins_purchase_email();
+		$wpelitepluginsupd_email = wpeliteplugins_all_plugins_purchase_email();
 		
 		// get product email
-		$email	= isset( $wpelitepluginsupd_email[$slug] ) ? $wpelitepluginsupd_email[$slug] : '';
+		$email = isset( $wpelitepluginsupd_email[$slug] ) ? $wpelitepluginsupd_email[$slug] : '';
 		
 		if( !empty( $email ) ) { // if email is not empty
 			if( is_email( $email ) ) { // if email is correct format
@@ -160,7 +160,7 @@ class WPElitePlugins_Upd_Admin {
 	 */
 	public function wpeliteplugins_request_args_add_site_url( $options, $slug, $pluginFile ) {
 		
-		$site_url	= site_url();
+		$site_url = site_url();
 		$options['cookies']	= array( 'site_url' => $site_url );
 		return $options;
 	}

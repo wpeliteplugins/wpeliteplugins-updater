@@ -25,10 +25,10 @@ if( !empty($wpeliteplugins_queued_updates ) ) {
 	
 	if( isset( $_GET['message'] ) && !empty( $_GET['message'] ) ) {
 		
-		echo '<div class="notice notice-success is-dismissible"><p>' . __( 'Licence key has been updated successfully.', 'wpelitepluginsupd' ) . '</p><button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button></div>' . "\n";
+		echo '<div class="notice notice-success is-dismissible"><p>' . __( 'Licence key has been updated successfully.', 'wpelitepluginsupd' ) . '</p></div>' . "\n";
 	}
 	
-	echo '<div class="notice notice-success is-dismissible">' . wpautop( sprintf( __( 'See below for a list of the WPElitePlugins products in use on %s. You can view our %s on how this works.', 'wpelitepluginsupd' ), get_bloginfo( 'name' ), '<a target="_blank" href="http://documents.wpeliteplugins.com/updater/wpeliteplugins-updater/">'.__( 'documentation', 'wpelitepluginsupd' ).'</a>' ) ) . '<button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button></div>' . "\n";
+	echo '<div class="notice notice-success is-dismissible">' . wpautop( sprintf( __( 'See below for a list of the WPElitePlugins products in use on %s. You can view our %s on how this works.', 'wpelitepluginsupd' ), get_bloginfo( 'name' ), '<a target="_blank" href="http://documents.wpeliteplugins.com/updater/wpeliteplugins-updater/">'.__( 'documentation', 'wpelitepluginsupd' ).'</a>' ) ) . '</div>' . "\n";
 	?>
 	<form action="" method="post" id="wpelitepluginsupd-conf" enctype="multipart/form-data">
 		<div class="tablenav top">
